@@ -1,20 +1,22 @@
 import java.io.*;
 import java.net.*;
+import java.util.*;
 
 public class ChatServer {
     private static final int PORT = 12345;
     private static ServerSocket serverSocket;
+    private static Map<String, PrintWriter> clients = new HashMap<>();
 
     public static void main(String[] args) {
         try {
             serverSocket = new ServerSocket(PORT);
             System.out.println("Servidor aguardando conexões...");
-            
+
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("Cliente conectado: " + clientSocket.getInetAddress());
 
-                // Criar uma nova thread para cada cliente conectado
+                // Criação de nova thread para cada cliente conectado
                 new Thread(new ClientHandler(clientSocket)).start();
             }
         } catch (IOException e) {
@@ -22,16 +24,18 @@ public class ChatServer {
         }
     }
 
+    // Classe que gerencia a comunicação com o cliente
     private static class ClientHandler implements Runnable {
         private Socket socket;
-        private PrintWriter out;
         private BufferedReader in;
+        private PrintWriter out;
+        private String clientName;
 
         public ClientHandler(Socket socket) {
             this.socket = socket;
             try {
-                out = new PrintWriter(socket.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                out = new PrintWriter(socket.getOutputStream(), true);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -39,19 +43,50 @@ public class ChatServer {
 
         public void run() {
             try {
+                // Receber o nome do cliente
+                out.println("Digite seu nome:");
+                clientName = in.readLine();
+                synchronized (clients) {
+                    clients.put(clientName, out);
+                }
+                System.out.println(clientName + " entrou no chat.");
+
+                // Enviar mensagem do cliente para o servidor
                 String message;
                 while ((message = in.readLine()) != null) {
-                    System.out.println("Recebido do cliente: " + message);
-                    out.println("Mensagem recebida: " + message);  // Responde ao cliente
+                    if (message.startsWith("/send")) {
+                        // Comando para enviar mensagem para outro cliente
+                        String[] parts = message.split(" ", 3);
+                        if (parts.length == 3) {
+                            String target = parts[1];
+                            String msg = parts[2];
+                            sendMessageToClient(target, msg);
+                        }
+                    } else {
+                        System.out.println(clientName + ": " + message);
+                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
+                // Remover cliente da lista ao desconectar
+                synchronized (clients) {
+                    clients.remove(clientName);
+                }
                 try {
                     socket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+            }
+        }
+
+        private void sendMessageToClient(String target, String message) {
+            PrintWriter targetOut = clients.get(target);
+            if (targetOut != null) {
+                targetOut.println(clientName + " diz: " + message);
+            } else {
+                out.println("Usuário " + target + " não encontrado.");
             }
         }
     }

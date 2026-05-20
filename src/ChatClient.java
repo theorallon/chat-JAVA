@@ -7,6 +7,7 @@ import javax.swing.*;
 public class ChatClient extends JFrame {
     private JTextArea taChat;
     private JTextField tfMessage;
+    private JTextField tfRecipient;
     private JButton btnSend;
     private Socket socket;
     private PrintWriter out;
@@ -28,9 +29,25 @@ public class ChatClient extends JFrame {
         JPanel panel = new JPanel();
         panel.setLayout(new BorderLayout());
 
-        tfMessage = new JTextField();
-        panel.add(tfMessage, BorderLayout.CENTER);
+        // Adicionando o label e o campo de texto para o destinatário
+        JPanel recipientPanel = new JPanel();
+        recipientPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        JLabel lblRecipient = new JLabel("Destinatário:");
+        recipientPanel.add(lblRecipient);
+        tfRecipient = new JTextField(15);
+        recipientPanel.add(tfRecipient);
+        panel.add(recipientPanel, BorderLayout.NORTH);
 
+        // Adicionando o label e o campo de texto para a mensagem
+        JPanel messagePanel = new JPanel();
+        messagePanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        JLabel lblMessage = new JLabel("Mensagem:");
+        messagePanel.add(lblMessage);
+        tfMessage = new JTextField(20);
+        messagePanel.add(tfMessage);
+        panel.add(messagePanel, BorderLayout.CENTER);
+
+        // Botão de envio
         btnSend = new JButton("Enviar");
         panel.add(btnSend, BorderLayout.EAST);
 
@@ -55,16 +72,21 @@ public class ChatClient extends JFrame {
             socket = new Socket(serverAddress, port);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            
+            // Enviar o nome do cliente
+            String name = JOptionPane.showInputDialog("Digite seu nome:");
+            out.println(name);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     private void sendMessage() {
+        String recipient = tfRecipient.getText();
         String message = tfMessage.getText();
-        if (!message.isEmpty()) {
-            out.println(message);  // Envia a mensagem para o servidor
-            taChat.append("Você: " + message + "\n");
+        if (!message.isEmpty() && !recipient.isEmpty()) {
+            out.println("/send " + recipient + " " + message);  // Envia a mensagem para o servidor
+            taChat.append("Você (para " + recipient + "): " + message + "\n");
             tfMessage.setText("");
         }
     }
@@ -74,7 +96,7 @@ public class ChatClient extends JFrame {
             try {
                 String message;
                 while ((message = in.readLine()) != null) {
-                    taChat.append("Servidor: " + message + "\n");
+                    taChat.append(message + "\n");
                 }
             } catch (IOException e) {
                 e.printStackTrace();
